@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <title>Simulare Examen Materiale - 55 Întrebări</title>
+    <style>
+        :root { --primary: #0056b3; --success: #28a745; --danger: #dc3545; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); padding: 20px; }
+        .card { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+        .stats { display: flex; justify-content: space-between; background: #eee; padding: 15px; border-radius: 8px; font-weight: bold; margin-bottom: 20px; }
+        .option { display: block; width: 100%; text-align: left; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; }
+        .option:hover { background: #f0f7ff; }
+        .selected { border: 2px solid var(--primary); background: #e7f1ff; }
+        .correct { background: #d4edda !important; border-color: var(--success) !important; color: #155724; }
+        .wrong { background: #f8d7da !important; border-color: var(--danger) !important; color: #721c24; }
+        .btn { background: var(--primary); color: white; border: none; padding: 15px 30px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; }
+        #quiz-area, #result-screen { display: none; }
+        .active { display: block !important; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div id="start-screen" class="active">
+        <h1>Examen Știința Materialelor</h1>
+        <p>Acest simulator alege 55 de întrebări aleatorii din documentul tău.</p>
+        <button class="btn" onclick="startTest()">ÎNCEPE TESTUL</button>
+    </div>
+
+    <div id="quiz-area">
+        <div class="stats">
+            <span>Întrebarea: <span id="q-idx">1/55</span></span>
+            <span style="color: var(--success)">Corecte: <span id="c-ok">0</span></span>
+            <span id="timer">Timp: 45:00</span>
+        </div>
+        <h3 id="q-text"></h3>
+        <div id="options-container"></div>
+        <button class="btn" id="next-btn" onclick="checkAnswer()" style="margin-top:20px;">VERIFICĂ RĂSPUNSUL</button>
+    </div>
+
+    <div id="result-screen" style="text-align: center;">
+        <h1>Test Finalizat!</h1>
+        <h2 id="final-score"></h2>
+        <button class="btn" onclick="location.reload()">REIA TESTUL</button>
+    </div>
+</div>
+
+<script>
+// BAZA DE DATE COMPLETĂ DIN DOCUMENTUL TĂU (Tranșa 1 + 2 + 3)
+const allQuestions = [
+    { q: "The total forces exerted on the molecules at the surface of a liquid, aiming to reduce its contact surface with the surrounding medium, is called:", a: ["viscosity", "lyophilicity", "lyophobicity", "surface tension", "hydrophobic and hydrophilic"], c: [3] },
+    { q: "The force with which a fluid at rest opposes the movement of another fluid in contact with it, due to friction between the two layers, is called:", a: ["viscosity", "lyophilicity", "lyophobicity", "surface tension", "hydrophobic and hydrophilic"], c: [0] },
+    { q: "The property of solids to be wetted by the liquids they come into contact with is called:", a: ["viscosity", "lyophilicity", "lyophobicity", "surface tension", "allotropy"], c: [1] },
+    { q: "The properties of solids to be wetted or not wetted by water are called:", a: ["viscosity", "lyophilicity (wettability)", "lyophobicity", "surface tension", "allotropy"], c: [1, 2] },
+    { q: "The property of solids NOT to be wetted by the liquids they come into contact with is called:", a: ["viscosity", "lyophilicity", "lyophobicity", "surface tension", "allotropy"], c: [2] },
+    { q: "What does the letter 'σ' represent in Jurin's relation?", a: ["viscosity", "lyophobicity coefficient", "capillary rise in construction pores", "surface tension", "capillary pore diameter"], c: [3] },
+    { q: "What does the letter 'd' represent in Jurin's relation?", a: ["viscosity", "lyophily coefficient", "capillary rise in construction pores", "surface tension", "capillary pore diameter"], c: [4] },
+    { q: "What does the letter 'h' represent in Jurin's relation?", a: ["capillary rise in construction pores", "lyophily coefficient", "lyophobicity coefficient", "surface tension", "the height to which water rises in capillaries"], c: [4] },
+    { q: "Structures in which solid particles are arranged in an ordered manner according to certain geometric laws are called:", a: ["homogeneous structures", "amorphous structures", "heterogeneous systems", "dispersed systems", "crystalline structures"], c: [4] },
+    { q: "Structures in which solid particles are arranged in a disordered manner are called:", a: ["homogeneous structures", "amorphous structures", "heterogeneous systems", "dispersed systems", "crystalline structures"], c: [1] },
+    { q: "A structure made up of multiple crystals is called:", a: ["crystal lattice", "ionic crystal lattice", "molecular crystal lattice", "atomic crystal lattice", "metallic crystal lattice"], c: [0] },
+    { q: "What is represented in figure '1a'? (Cube/Prism shape)", a: ["rhombohedral crystallization system", "hexagonal crystallization system", "rhombic crystallization system", "tetragonal crystallization system", "cubic crystallization system"], c: [4] },
+    { q: "What is represented in figure '1b'? (Diamond shape)", a: ["spherical crystallization system", "hexagonal crystallization system", "rhombohedral crystallization system", "tetragonal crystallization system", "cubic crystallization system"], c: [2] },
+    { q: "What is represented in figure '1c'? (Hexagon shape)", a: ["rhombohedral crystallization system", "hexagonal crystallization system", "rhombic crystallization system", "tetragonal crystallization system", "cubic crystallization system"], c: [1] },
+    { q: "Crystal lattices that have positive and negative ions arranged alternately in nodes, bound by electrostatic forces, are called:", a: ["crystal lattices", "ionic crystal lattices", "molecular crystal lattices", "atomic crystal lattices", "metallic crystal lattices"], c: [1] },
+    { q: "Crystal lattices that have metal atoms (ions) arranged in nodes are called:", a: ["crystal lattices", "ionic crystal lattices", "molecular crystal lattices", "atomic crystal lattices", "metallic crystal lattices"], c: [4] },
+    { q: "Crystal lattices that have molecules in nodes bound together by Van der Waals forces are called:", a: ["crystal lattices", "ionic crystal lattices", "molecular crystal lattices", "atomic crystal lattices", "metallic crystal lattices"], c: [2] },
+    { q: "Coarse dispersion systems in a gaseous dispersion medium are:", a: ["atmospheric air", "alloys", "soils", "fog, smoke, aerosols", "gels"], c: [3] },
+    { q: "The property of a chemical element to crystallize in multiple crystallization systems depending on pressure and temperature conditions is called:", a: ["allotropy", "isomorphism", "polymorphism", "substance pH", "water hardness"], c: [2] },
+    { q: "The property of chemical substances with similar chemical composition to crystallize in identical crystal structures is called:", a: ["allotropy", "isomorphism", "polymorphism", "substance pH", "water hardness"], c: [1] },
+    { q: "The decimal logarithm with changed sign of the hydrogen ion concentration (H+) existing at a given moment in water is called:", a: ["allotropy", "isomorphism", "polymorphism", "substance pH", "water hardness"], c: [3] },
+    { q: "The totality of Ca and Mg salts dissolved in water is defined as:", a: ["allotropy", "isomorphism", "polymorphism", "substance pH", "water hardness"], c: [4] },
+    { q: "What are the factors that determine the states of aggregation of substances:", a: ["particle mass", "kinetic energy of particles (and attraction forces)", "attraction forces between particles", "speed of movement of particles", "volume of particles"], c: [1, 2] },
+    { q: "The relation h = 4σ / dρg is named:", a: ["Pythagoras' law", "Hooke's law", "Blaine's law", "Jurin's law", "Young's law"], c: [3] },
+    { q: "The content of Ca and Mg bicarbonates that decompose upon boiling water is called:", a: ["relative humidity", "temporary hardness", "permanent hardness", "saturation humidity", "corrosion"], c: [1] },
+    { q: "The content of salts (chlorides, nitrates, sulfates, silicates) that do NOT decompose upon boiling water is called:", a: ["relative humidity", "temporary hardness", "permanent hardness", "saturation humidity", "corrosion"], c: [2] },
+    { q: "The phenomenon of degradation of materials due to the action of aggressive agents existing in the external environment is called:", a: ["relative humidity", "temporary hardness", "permanent hardness", "saturation humidity", "corrosion"], c: [4] },
+    { q: "A pH greater than 7 of a water defines:", a: ["water oxidizability", "water mineralization", "acidic character of water", "degree of turbidity of water", "basic character of water"], c: [4] },
+    { q: "A pH less than 7 of a water defines:", a: ["water oxidizability", "water mineralization", "acidic character of water", "degree of turbidity of water", "basic character of water"], c: [2] },
+    { q: "The quantity of substance expressed in kilograms, existing in a body, is defined as:", a: ["apparent volume of the body", "volume of the body", "body weight measured in N", "body mass", "body density"], c: [3] },
+    { q: "The force with which a body is attracted towards the center of the earth is defined as:", a: ["apparent volume of the body measured in m³", "body volume measured in m³", "body weight", "body mass measured in kg", "body density measured in kg/m³"], c: [2] },
+    { q: "The space occupied only by solid substance defines:", a: ["apparent volume of the body", "real volume of the body", "body weight", "body mass", "body density"], c: [1] },
+    { q: "The space occupied by a porous body is defined as:", a: ["apparent volume of the body", "real volume of the body", "body weight", "body mass", "body density"], c: [0] },
+    { q: "The mass of the unit volume of a material is defined as:", a: ["apparent volume of the body", "real volume of the body", "body weight", "body mass", "body density"], c: [4] },
+    { q: "Which property is measured in S.I. in kilograms?", a: ["apparent volume", "real volume", "weight", "mass", "density"], c: [3] },
+    { q: "Which property is measured in S.I. in m³?", a: ["apparent volume (or Volume in general)", "real volume", "weight", "mass", "density"], c: [0, 1] },
+    { q: "Which property is measured in S.I. in Newtons?", a: ["apparent volume of the body", "real volume of the body", "body weight", "body mass", "body density"], c: [2] },
+    { q: "Which property is measured in S.I. in kg/m³?", a: ["apparent volume of the body", "real volume of the body", "body weight", "body mass", "body density"], c: [4] },
+    { q: "The degree of filling (occupancy) of the apparent volume with solid matter defines:", a: ["material humidity", "water absorption of the material", "void volume of the material", "material porosity", "material compactness"], c: [4] },
+    { q: "The degree of filling (occupancy) with pores of the apparent volume of the material is defined as:", a: ["material humidity", "water absorption of the material", "void volume of the material", "material porosity", "material compactness"], c: [3] },
+    { q: "The space between granules forming a pile determines:", a: ["material humidity", "water absorption of the material", "void volume of the material", "material porosity", "material compactness"], c: [2] },
+    { q: "The amount of physically bound water existing in a material at a given moment is named:", a: ["material humidity (moisture content)", "water absorption of the material", "void volume of the material", "material porosity", "material compactness"], c: [0] },
+    { q: "The amount of water that a material absorbs and retains in pores and capillaries is named:", a: ["material humidity", "water absorption of the material", "void volume of the material", "material porosity", "material compactness"], c: [1] },
+    { q: "The ratio between the amount of water contained in natural state by a material and its dry mass, expressed in percentage, is named:", a: ["mass absorption", "relative humidity", "absolute humidity", "volume absorption", "void volume"], c: [2] },
+    { q: "The ratio between the amount of water contained in natural state by a material and its wet mass, expressed in percentage, is named:", a: ["mass absorption", "relative humidity", "absolute humidity", "volume absorption", "void volume"], c: [1] },
+    { q: "The ratio between the amount of water a dry material attracts into its mass when put in contact with a humid medium and its dry mass is:", a: ["mass absorption", "relative humidity", "absolute humidity", "volume absorption"], c: [0] },
+    { q: "The ratio between the amount of water a dry material attracts when put in contact with a humid medium and its apparent volume is named:", a: ["mass absorption", "relative humidity", "absolute humidity", "volume absorption", "void volume"], c: [3] },
+    { q: "The ratio between the amount of water expressed in volume units that fills a vessel full of gravel saturated in a loose state and the volume of the vessel defines:", a: ["mass absorption", "relative humidity", "absolute humidity", "volume absorption", "void volume"], c: [4] },
+    { q: "The permeability of materials is their property to:", a: ["oppose the passage through pores and fissures of fluids (air, water, etc.)", "allow the passage through their structure of fluids (air, water, vapors, etc.)", "resist repeated freeze-thaw actions", "transmit a heat flux through their mass", "suffer dimensional changes under external actions"], c: [1] },
+    { q: "Impermeability is defined as the property of materials to:", a: ["oppose the passage through their structure of fluids (air, water, etc.)", "allow fluids to pass through pores and fissures", "resist repeated freeze-thaw actions", "transmit a heat flux through their mass", "suffer dimensional changes under external actions"], c: [0] },
+    { q: "The frost resistance (gelivity) of materials is defined as their property to:", a: ["oppose the passage through pores and fissures of fluids", "allow fluids to pass through pores and fissures", "resist repeated freeze-thaw actions", "transmit a heat flux through their mass", "suffer dimensional changes under external actions"], c: [2] },
+    { q: "The thermal conductivity of bodies is defined as their capacity to:", a: ["oppose the passage through pores and fissures of fluids", "allow fluids to pass through pores and fissures", "resist repeated freeze-thaw actions", "transmit a heat flux through their mass due to temperature differences", "suffer dimensional changes under external actions"], c: [3] },
+    { q: "The lateral area of all granules contained in one gram of powdery material is named:", a: ["lateral surface", "total surface", "total area", "specific surface", "specific volume"], c: [3] },
+    { q: "In the relation l = l₀ (1 + α·Δt), the symbol 'Δt' represents:", a: ["the temperature variation to which the material is subjected", "specific deformation of the material", "the effort to which the material is subjected", "the bending moment in the respective section", "the section modulus"], c: [0] },
+    { q: "The unit of measurement in the International System (S.I.) for mass is:", a: ["Kg", "cm²/g", "Kg/m³", "m³", "N"], c: [0] },
+    { q: "The unit of measurement in the International System (S.I.) for volume is:", a: ["Kg", "cm²/g", "Kg/m³", "m³", "N"], c: [3] },
+    { q: "The unit of measurement in the International System (S.I.) for density is:", a: ["Kg", "cm²/g", "Kg/m³", "m³", "N"], c: [2] },
+    { q: "The unit of measurement for the specific surface area of powders in the International System (S.I.) is:", a: ["Kg", "m²/kg", "Kg/m³", "m³", "N"], c: [1] },
+    { q: "The unit of measurement for the weight of bodies in the International System (S.I.) is:", a: ["Kg", "cm²/g", "Kg/m³", "m³", "N (Newton)"], c: [4] },
+    { q: "The mass of a material can be determined by:", a: ["measuring with a scale (truck scale)", "measuring with a dynamometer", "weighing with a balance", "measuring dimensions and using geometric formulas", "displaced liquid volume method"], c: [0, 2] },
+    { q: "The volume and apparent volume of a material having a regular geometric shape can be determined by:", a: ["measuring with a scale", "measuring with a dynamometer", "weighing with a balance", "measuring dimensions and using geometric formulas", "displaced liquid volume method"], c: [3] },
+    { q: "The volume of a material with an irregular geometric shape can be determined by:", a: ["measuring with a scale", "measuring with a dynamometer", "weighing with a balance", "measuring dimensions and using geometric formulas", "displaced liquid volume method"], c: [4] },
+    { q: "The volume of a porous material is determined by the method of:", a: ["flowmeter", "paraffin coating (wax immersion)", "Blaine permeabilimeter", "pycnometer", "weighing wet material, drying it, and weighing dry material"], c: [3] },
+    { q: "The apparent volume of a porous material with an irregular geometric shape is determined by the method of:", a: ["flowmeter", "paraffin coating combined with the displaced liquid volume method", "Blaine permeabilimeter", "pycnometer", "weighing wet material, drying it, and weighing dry material"], c: [1] },
+    { q: "The specific surface area of a powder is determined by the method of:", a: ["flowmeter", "paraffin coating", "Blaine permeabilimeter", "pycnometer", "weighing wet material, drying it, and weighing dry material"], c: [2] },
+    { q: "In the specific surface formula S = K * [sqrt(n^3)*sqrt(t) / (rho_c*(1-n)*sqrt(eta))], the letter 'K' signifies:", a: ["porosity of the powder in the permeabilimeter", "time for oil to drop in the manometer from division 70 to 15", "Blaine permeabilimeter constant", "density of the powder in the permeabilimeter", "viscosity of the air in the room where the determination is made"], c: [2] },
+    { q: "In the specific surface formula S = K * ..., the letter 'n' signifies:", a: ["porosity of the powder in the permeability cell", "time for oil to drop in the manometer from division 70 to 15", "Blaine permeabilimeter constant", "density of the powder in the permeability cell", "viscosity of the air in the room where the determination is made"], c: [0] },
+    { q: "In the specific surface formula S = K * ..., the letter 't' signifies:", a: ["porosity of the powder in the permeabilimeter", "time during which the liquid level in the manometer drops from division 70 to 15", "Blaine permeabilimeter constant", "density of the powder in the permeability cell", "viscosity of the air in the room where the determination is made"], c: [1] },
+    { q: "In the specific surface formula S = K * ..., the letter 'rho_c' signifies:", a: ["porosity of the powder in the permeabilimeter", "time during which the liquid level drops", "Blaine permeabilimeter constant", "density of the cement powder in the permeability cell", "viscosity of the air in the room where the determination is made"], c: [3] },
+    { q: "In the specific surface formula S = K * ..., the letter 'eta' signifies:", a: ["porosity of the powder in the permeabilimeter", "time during which the liquid level drops", "Blaine permeabilimeter constant", "density of the cement powder", "viscosity of the air in the room where the determination is made"], c: [4] },
+    { q: "The humidity (moisture content) of a material is determined by:", a: ["flowmeter method", "weighing dry material, introducing it in water and weighing at saturation", "Blaine permeabilimeter method", "pycnometer method", "weighing the wet material, drying it, and final weighing"], c: [4] },
+    { q: "In the absolute humidity formula %Wa = (mu - m) / m * 100, the letter 'm' signifies:", a: ["mass of saturated material", "mass of wet material", "mass of material as it is in nature", "mass of dry material", "mass of material after staying in water for a certain time"], c: [3] },
+    { q: "In the absolute humidity formula %Wa = (mu - m) / m * 100, the letter 'mu' signifies:", a: ["mass of saturated material", "mass of wet material", "mass of material as it is in nature", "mass of dry material", "mass of material after staying in water for 10 hours"], c: [1, 2] },
+    { q: "Water absorption of a material is determined by:", a: ["flowmeter method", "weighing dry material, introducing it in water, and weighing the saturated material", "Blaine permeabilimeter method", "pycnometer method", "weighing wet material, drying it, and weighing dry material"], c: [1] },
+    { q: "In the mass water absorption formula %Am = (mu - m) / m * 100, the letter 'm' signifies:", a: ["mass of saturated material", "mass of wet material", "mass of material as it is in nature", "mass of dry material", "mass of material after staying in water for a certain time"], c: [3] },
+    { q: "In the mass water absorption formula %Am = (mu - m) / m * 100, the letter 'mu' signifies:", a: ["mass of saturated material", "mass of material in a pile", "mass of material as it is in nature", "mass of wet material", "mass of frozen material"], c: [0] },
+    { q: "In the volume water absorption formula %Av = (mu - m) / Va * 100, the letter 'Va' signifies:", a: ["apparent volume of saturated material", "apparent volume of wet material", "volume of material as it is in nature", "apparent volume of dry material", "volume of material after staying in water for a certain time"], c: [3] },
+    { q: "The volume of voids is determined by:", a: ["filling a vessel of known volume with material in three layers, each layer being compacted;", "filling a vessel of known volume allowing material to fall from a height of 10cm;", "saturating the material before determination, filling a vessel of known volume with saturated material in a loose state, weighing, filling the vessel with material with water and weighing;", "reading pressure difference of air passing through the material in a flowmeter cell;", "reading the time necessary for liquid in Blaine permeabilimeter to return."], c: [2] },
+    { q: "In the void volume formula %Vgol = (m2 - m1) / Vvas * 100 the letter 'm2' signifies:", a: ["mass of empty vessel", "mass of vessel full with saturated material in compacted state and water", "mass of vessel full with saturated material in loose state", "mass of vessel full with saturated material in loose state and water", "mass of vessel full with saturated material in compacted state"], c: [3] },
+    { q: "In the void volume formula %Vgol = (m2 - m1) / Vvas * 100 the letter 'm1' signifies:", a: ["mass of empty vessel", "mass of vessel full with saturated material in compacted state and water", "mass of vessel full with saturated material in compacted state", "mass of vessel full with saturated material in loose state and water", "mass of vessel full with saturated material in loose state"], c: [4] },
+    { q: "Bulk density in loose state is determined by:", a: ["weighing empty vessel, filling vessel of known volume with material in three layers, each compacted, and weighing full vessel;", "weighing empty vessel, filling vessel (of known volume) allowing material to fall from 10 cm height above material surface and weighing;", "saturating material before determination;", "reading pressure difference of air passing through material in flowmeter cell;", "reading time necessary for liquid in Blaine permeabilimeter."], c: [1] },
+    { q: "The specific surface area of a powder is determined as a function of:", a: ["filling a vessel of known volume with material in three layers, compacted;", "filling a vessel allowing material to fall from 10 cm;", "saturating material before determination;", "reading pressure difference;", "time in which the manometer liquid of the Blaine permeabilimeter drops from division 70 to 15."], c: [4] },
+    { q: "Bulk density in compacted (dense) state is determined by:", a: ["weighing vessel with known volume, empty, filling it with material in three layers, each layer being compacted and weighing vessel full with material;", "weighing vessel empty, filling vessel allowing material to fall from 10 cm;", "saturating material before determination;", "reading pressure difference;", "reading time necessary for liquid return."], c: [0] },
+    { q: "The space occupied by materials found in bulk (loose pile) determines:", a: ["body mass", "body weight", "real volume of the body", "apparent volume of the body", "bulk volume (volume in pile)"], c: [4] },
+    { q: "The space occupied by the solid substance within a body determines:", a: ["body mass", "body weight", "real volume of the body", "apparent volume of the body", "bulk volume"], c: [2] },
+    { q: "In the case of the displaced liquid volume method, following laboratory determinations, one measures:", a: ["mass of powder in burette", "volume of powder in burette", "volume leaked from burette", "initial and final volume of the liquid in the graduated cylinder", "mass after paraffin coating"], c: [3] },
+    { q: "The pycnometer method is used for determining:", a: ["real volume for compact bodies with regular geometric shape", "real volume for compact bodies with irregular geometric shape", "volume of materials in powder form", "volume of porous materials with regular geometric shape", "volume of porous materials with irregular geometric shape"], c: [1, 2] },
+    { q: "The paraffin coating method combined with displaced liquid volume method is used for determining:", a: ["real volume for compact bodies with regular geometric shape", "real volume for compact bodies with irregular geometric shape", "volume of materials in powder form", "volume of porous materials with regular geometric shape", "apparent volume of porous materials with irregular geometric shape"], c: [4] },
+    { q: "The displaced liquid volume method is used for determining:", a: ["real volume for compact bodies with regular geometric shape", "real volume for compact bodies with irregular geometric shape", "volume of materials in powder form", "volume of porous materials with regular geometric shape", "volume of porous materials with irregular geometric shape"], c: [1] },
+    { q: "In the case of the pycnometer method, following laboratory determinations, one measures:", a: ["mass of powder in burette", "volume of powder in burette", "volume of liquid, inert to the porous material, leaked from the burette", "initial and final volume in graduated cylinder", "mass of liquid in pycnometer"], c: [4] },
+    { q: "The apparent volume of a porous body with irregular geometric shape determined by the paraffin method is calculated with the relation:", a: ["V = L * l * h", "Va = L * l * h", "V = 25 - Vi", "V = Vf - Vi", "Va = Vf - Vi - (mcp - m) / rhop"], c: [4] },
+    { q: "In the calculation relation of the apparent volume of a porous body with irregular geometric shape determined by the paraffin method, the physical significance of 'Vf' is:", a: ["initial volume of water in cylinder", "final volume of water in cylinder with the body submerged in water", "density of paraffin", "mass of porous body", "mass of porous body coated in paraffin"], c: [1] },
+    { q: "In the calculation relation (same as above), the physical significance of 'Vi' is:", a: ["initial volume of water in cylinder", "final volume of water in cylinder with body submerged", "density of paraffin", "mass of porous body", "mass of porous body coated in paraffin"], c: [0] },
+    { q: "In the calculation relation (same as above), the physical significance of 'rhop' is:", a: ["initial volume of water in cylinder", "final volume of water in cylinder with body submerged", "density of paraffin", "mass of porous body", "mass of porous body coated in paraffin"], c: [2] },
+    { q: "In the calculation relation (same as above), the physical significance of 'mcp' is:", a: ["initial volume of water in cylinder", "final volume of water in cylinder with body submerged", "density of paraffin", "mass of porous body", "mass of porous body coated in paraffin"], c: [4] },
+    { q: "In the calculation relation (same as above), the physical significance of 'm' is:", a: ["initial volume of water in cylinder", "final volume of water in cylinder with body submerged", "density of paraffin", "mass of porous body", "mass of porous body coated in paraffin"], c: [3] },
+    { q: "For a material found in a bulk (loose) state, one determines:", a: ["apparent density", "real density", "density in stack", "bulk density in loose state", "bulk density in compacted state"], c: [3] },
+    { q: "For a compact material, one calculates:", a: ["apparent density", "real density", "density in stack", "bulk density in loose state", "bulk density in compacted state"], c: [1] },
+    { q: "The apparent volume of a porous body having the shape of a prism is calculated with the relation:", a: ["V = L * l * h", "Va = L * l * h", "Va = 4/3 pi r^3", "V = pi r^2 h", "Va = 2 pi r^2 h"], c: [1] },
+    { q: "The real volume of a compact body having the shape of a cylinder is calculated with the relation:", a: ["V = L * l * h", "Va = L * l * h", "Va = 4/3 pi r^3", "V = pi r^2 h", "Va = 2 pi r^2 h"], c: [3] },
+    { q: "The apparent volume of a porous body having the shape of a sphere is calculated with the relation:", a: ["V = L * l * h", "Va = L * l * h", "Va = 4/3 pi r^3", "V = pi r^2 h", "Va = 2 pi r^2 h"], c: [2] },
+    { q: "The real volume of a compact body having the shape of a prism is calculated with the relation:", a: ["V = L * l * h", "Va = L * l * h", "V = 25 - Vsi", "V = Vf - Vi", "Va = 2 pi r^2 h"], c: [0] },
+    { q: "The real volume for a body with irregular geometric shape determined by the displaced liquid volume method is calculated with the relation:", a: ["V = L * l * h", "Va = L * l * h", "V = 25 - Vsi", "V = Vf - Vi", "Va = 2 pi r^2 h"], c: [3] },
+    { q: "The mass of the unit volume defines:", a: ["weight of a body", "density of the body", "specific gravity", "porosity", "compactness"], c: [1] },
+    { q: "The real volume in the case of a material in powder form, using the pycnometer method, is calculated with the relation:", a: ["V = L * l * h", "Va = L * l * h", "V = 25 - Vsi", "V = Vf - Vi", "Mass formula"], c: [2] },
+    { q: "For a porous material, one calculates:", a: ["apparent density", "real density", "stack density", "loose bulk density", "packed bulk density"], c: [0] },
+    { q: "The bulk volume for a material in bulk (vrac) is calculated with the relation:", a: ["L * l * h", "Vf - Vi", "Vf - Vi - Vp", "V + Vp + Vvoids", "25 - Vs"], c: [3] },
+    { q: "The weight per unit volume defines:", a: ["volume of voids in the material", "compactness of the material", "density of the material", "specific weight of a material", "porosity of the material"], c: [3] },
+    { q: "A porous material is characterized by:", a: ["C < 1", "C = 1", "n > 1", "n < 1", "n = 0"], c: [0, 3] },
+    { q: "With the relation G/V one calculates:", a: ["compactness of the material", "porosity of the material", "density of the material", "specific weight", "volume of voids in the material"], c: [3] },
+    { q: "With the relation m/V one calculates:", a: ["compactness of the material", "porosity of the material", "density of the material", "specific weight", "volume of voids in the material"], c: [2] },
+    { q: "A compact material is characterized by:", a: ["C < 1", "C = 1", "n > 1", "n < 1", "n = 0"], c: [1, 4] },
+    { q: "The degree of filling of the apparent volume with solid material determines:", a: ["volume of voids in the material", "compactness of the material", "density of the material", "specific weight", "porosity"], c: [1] },
+    { q: "With the relations V/Va and rho_a/rho one calculates:", a: ["compactness of the material", "porosity of the material", "density of the material", "specific weight", "volume of voids in the material"], c: [0] },
+    { q: "The degree of filling of the apparent volume with pores determines:", a: ["volume of voids in the material", "compactness of the material", "density of the material", "specific weight", "porosity of the material"], c: [4] },
+    { q: "With the relation Vp/Va one calculates:", a: ["compactness of the material", "porosity of the material", "density of the material", "specific weight", "volume of voids in the material"], c: [1] },
+    { q: "The totality of existing spaces between the granules that form a heap defines:", a: ["volume of voids", "compactness of the material", "density of the material", "specific weight", "porosity of the material"], c: [0] },
+    { q: "In the case of a wet material with mass (mu), with the relation ((mu - m) / mu) * 100%, one calculates:", a: ["relative humidity", "absolute humidity", "water absorption by mass", "water absorption by volume", "capillarity"], c: [0] },
+    { q: "In the case of a wet material in its natural state, with the relation ((mu - m) / m) * 100%, one calculates:", a: ["relative humidity", "absolute humidity", "water absorption by mass", "water absorption by volume", "capillarity"], c: [1] },
+    { q: "The property of materials to allow a certain amount of water to pass through a determined surface, in a given time interval, at constant pressure and temperature, determines:", a: ["water permeability of the material", "air permeability of the material", "vapor permeability of the material", "capillarity of the material", "frost resistance (gelivity) of the material"], c: [0] },
+    { q: "The softening coefficient of materials is determined with the relation:", a: ["Rwet / Rdry", "Rdry / Rwet", "(R1 - R2) / R1", "R1 / (R1 - R2)", "(m1 - m2) / m1"], c: [0] },
+    { q: "The property of materials to allow a certain amount of air to pass through a determined surface, in a given time interval, at constant pressure and temperature, determines:", a: ["water permeability of the material", "air permeability of the material", "vapor permeability of the material", "capillarity of the material", "frost resistance (gelivity) of the material"], c: [1] },
+    { q: "The property of materials to absorb water from the environment through pores until equilibrium is established determines:", a: ["water permeability of the material", "air permeability of the material", "vapor permeability of the material", "capillarity of the material", "frost resistance (gelivity) of the material"], c: [3] },
+    { q: "The property of water-saturated materials to resist repeated freeze-thaw actions determines:", a: ["water permeability of the material", "air permeability of the material", "vapor permeability of the material", "capillarity of the material", "frost resistance (gelivity) of the material"], c: [4] },
+    { q: "The property of materials to allow a certain amount of vapors to pass through a determined surface, in a given time interval, at constant pressure and temperature, determines:", a: ["water permeability of the material", "air permeability of the material", "vapor permeability of the material", "capillarity of the material", "frost resistance (gelivity) of the material"], c: [2] },
+    { q: "The temperature at which a material softens under its own weight defines:", a: ["flash point of the material", "ignition point of the material", "softening point of the material", "refractoriness point of the material", "melting point of the material"], c: [3] },
+    { q: "The temperature at which the concentration of organic substances (through progressive heating) has become high enough to ignite in contact with a flame determines:", a: ["inflammability point", "ignition point", "softening point", "refractoriness point", "melting point"], c: [1] },
+    { q: "The temperature at which the concentration of organic substances (through progressive heating) has become high enough to ignite in air even in the absence of a flame determines:", a: ["inflammability point", "ignition point", "softening point", "refractoriness point", "melting point"], c: [0] },
+    { q: "A material that contains a surplus of caloric energy transmits it through:", a: ["conduction", "convection", "radiation", "penetration", "gelivity"], c: [0, 1, 2] },
+    { q: "Resistance to thermal transfer through an element of thickness d, is:", a: ["(d * b) / lambda", "d / (b * lambda)", "(b * lambda) / d", "(lambda * b) / d", "lambda / (b * d)"], c: [1] },
+    { q: "The amount of heat that passes through a surface of 1 m² with a thickness of 1 m, in a time of 1 h, at a temperature difference of 1°C, between the faces of a homogeneous material defines:", a: ["thermal transfer resistance", "specific heat", "thermal conductivity", "calorific capacity", "linear expansion coefficient"], c: [2] },
+    { q: "The heat necessary for one kg of a material to increase its temperature by 1°C, in normal temperature and pressure conditions, defines:", a: ["thermal transfer resistance", "specific heat", "thermal conductivity", "calorific capacity", "linear expansion coefficient"], c: [1] },
+    { q: "The heat released at the complete burning of one kg of that material defines:", a: ["thermal transfer resistance", "specific heat", "thermal conductivity", "calorific capacity", "linear expansion coefficient"], c: [3] },
+    { q: "Non-combustible materials:", a: ["ignite when their temperature exceeds a certain value in the absence of a fire source", "burn even after the fire source has been removed", "ignite with difficulty and burn without flame", "extinguish in the absence of the fire source", "do not ignite and do not burn"], c: [4] },
+    { q: "Combustible materials:", a: ["ignite when their temperature exceeds a certain value in the absence of a fire source", "burn even after the fire source has been removed", "ignite with difficulty and burn without flame", "extinguish in the absence of the fire source", "do not ignite and do not burn, but if subjected for a long time to a thermal regime with high temperatures they decompose chemically"], c: [1] },
+    { q: "Hardly combustible materials:", a: ["ignite when their temperature exceeds a certain value in the absence of a fire source", "burn even after the fire source has been removed", "ignite with difficulty and burn without flame", "extinguish in the absence of the fire source", "do not ignite and do not burn, but if subjected for a long time to a thermal regime with high temperatures they decompose chemically"], c: [2] },
+    { q: "Inflammable materials:", a: ["ignite when their temperature exceeds a certain value in the absence of a fire source", "burn even after the fire source has been removed", "ignite with difficulty and burn without flame", "extinguish in the absence of the fire source", "do not ignite and do not burn"], c: [0] },
+    { q: "The increase of a volume unit for one degree of temperature defines:", a: ["coefficient of volume expansion", "specific heat", "thermal conductivity", "calorific capacity", "linear expansion coefficient"], c: [0] },
+    { q: "The increase of a length unit for one degree of temperature defines:", a: ["thermal transfer resistance", "specific heat", "thermal conductivity", "calorific capacity", "linear expansion coefficient"], c: [4] },
+    { q: "The material used for determining the Blaine permeabilimeter constant is:", a: ["cement", "standard powder", "mercury", "lime", "plaster"], c: [1] },
+    { q: "Specific surface for a powder, using the Blaine permeabilimeter, is defined as being:", a: ["volume of all granules within one gram of powder", "volume of all granules within 5 grams of powder", "lateral surface of all granules within one gram of powder", "lateral surface of all granules within 5 grams of powder", "lateral surface of all granules within one ton of powder"], c: [2] },
+    { q: "The measurement unit for specific surface by the Blaine permeabilimeter method is:", a: ["m²/g", "cm³/g", "cm²/g", "cm/g", "dm²/g"], c: [0, 2] },
+    { q: "The mass of powder necessary for determining the specific surface by the Blaine permeabilimeter method is calculated with the relation:", a: ["m = rho * V (1 - n)", "m = rho * V", "m = rho * V (1 - eta)", "m = rho * V * K", "m = rho * V * t"], c: [0] },
+    { q: "The amount of heat necessary for the destruction of the solid lattice and transition to a liquid state determines:", a: ["calorific capacity", "specific heat at constant volume", "specific heat at constant pressure", "latent heat of melting", "latent heat of solidification"], c: [3] },
+    { q: "Dislocations that appear under the action of external mechanical loads can be:", a: ["lattices with unoccupied nodes", "lattices with foreign atoms", "distortions (bending)", "translations (shearing)", "twinning (maclări)"], c: [2, 3, 4] },
+    { q: "A mixture in which there are no separation surfaces between the component substances is called:", a: ["homogeneous structure", "amorphous structure", "heterogeneous system", "dispersed system", "crystalline structure"], c: [0] },
+    { q: "A mixture in which the component substances are separated from each other by contact surfaces is called:", a: ["homogeneous structure", "amorphous structure", "heterogeneous system", "dispersed system", "crystalline structure"], c: [2] },
+    { q: "A mixture formed of two or more substances is called:", a: ["homogeneous structure", "amorphous structure", "heterogeneous system", "dispersed system", "crystalline structure"], c: [3] },
+    { q: "Colloidal dispersion systems are:", a: ["fog", "aerosols", "smoke", "atmospheric air", "sols and gels"], c: [4] },
+    { q: "The phenomenon of accumulation on the interface of one phase of a dispersed system of the molecules of the neighboring phase is called:", a: ["absorption", "desorption", "sorption", "adsorption", "chemosorption"], c: [3] },
+    { q: "In the case where the molecules adsorbed by a surface diffuse into the mass of the substance, the phenomenon is called:", a: ["absorption", "desorption", "sorption", "adsorption", "chemosorption"], c: [0] },
+    { q: "The phenomenon that cumulates adsorption and absorption defines:", a: ["absorption", "desorption", "sorption", "adsorption", "chemosorption"], c: [2] },
+    { q: "The reverse phenomenon of sorption is called:", a: ["absorption", "desorption", "sorption", "adsorption", "chemosorption"], c: [1] },
+    { q: "In the case where chemical bonds are established between the adsorbent and the adsorbate, the phenomenon is called:", a: ["absorption", "desorption", "sorption", "adsorption", "chemosorption"], c: [4] },
+    { q: "Substances that modify the surface tension of the material's surface to which they are applied, changing its character from lyophilic to lyophobic or vice-versa, are called:", a: ["hydrophobic substances", "lyophobic substances", "lyophilic substances", "surfactant (tensioactive) substances", "hydrophilic substances"], c: [4] },
+    { q: "The major quantitative component within a mixture is called:", a: ["dispersant phase", "dispersion medium", "dispersoid", "dispersed phase", "dispersed system"], c: [0, 1] },
+    { q: "The minor quantitative component within a mixture is called:", a: ["dispersant phase", "dispersion medium", "dispersoid", "dispersed phase", "dispersed system"], c: [2, 3] },
+    { q: "The solid phase on whose surface adsorption occurs is called:", a: ["adsorbent", "adsorbate", "absorbent", "absorbate", "solvent"], c: [0] },
+    { q: "The liquid or gaseous phase that is adsorbed is called:", a: ["adsorbent", "adsorbate", "absorbent", "absorbate", "solvate"], c: [1] },
+    { q: "The homogeneous mixture obtained by dissolving a substance into a liquid medium is called:", a: ["solubility", "electrolytic dissociation", "solution", "electroplating (galvanostegie)", "electrotyping (galvanoplastie)"], c: [2] },
+    { q: "The maximum amount of solute that can dissolve in 100g of solution at a certain temperature is called:", a: ["solubility", "electrolytic dissociation", "solution", "electroplating", "electrotyping"], c: [0] },
+    { q: "The phase of the solution in which a certain substance is dissolved is called:", a: ["percentage concentration", "concentration", "solvent (dissolving agent)", "molarity (molar concentration)", "solvat"], c: [2] },
+    { q: "The substance that mixes/dissolves into a liquid bears the name of:", a: ["percentage concentration", "concentration", "solvent (dissolving agent)", "molarity (molar concentration)", "solute"], c: [4] },
+    { q: "The number of moles of solute dissolved in one liter of solution is called:", a: ["percentage concentration", "concentration", "solvent (dissolving agent)", "molarity (molar concentration)", "percentage concentration"], c: [3] },
+    { q: "The ratio between the mass of the solute and the mass of the solution, expressed in percent, is called:", a: ["percentage concentration by mass", "percentage concentration by volume", "molality (molal concentration)", "molarity (molar concentration)", "percentage concentration"], c: [0] },
+    { q: "The ratio between the volume of the solute and the volume of the solution, expressed in percent, is called:", a: ["percentage concentration by mass", "percentage concentration by volume", "molality (molal concentration)", "molarity (molar concentration)", "percentage concentration"], c: [1] },
+    { q: "The number of moles of solute dissolved in one kilogram of solvent is called:", a: ["percentage concentration by mass", "percentage concentration by volume", "molality (molal concentration)", "molarity (molar concentration)", "percentage concentration"], c: [2] },
+    { q: "According to the particle size of the dispersoid, dispersion systems can be:", a: ["molecular dispersions", "molar dispersions", "colloidal dispersions", "molal dispersions", "coarse dispersions"], c: [0, 2, 4] },
+    { q: "Choose the correct definition of binders:", a: ["natural construction material that hardens and embeds other materials in its mass in the presence of water", "natural or artificial construction material which, when mixed with water, forms a plastic paste that can embed other materials in its mass and, due to physical and chemical processes, transforms into a rigid mass that hardens over time", "natural or artificial construction material which, mixed with water, forms a plastic paste that hardens only in a dry environment", "natural or artificial construction material which, mixed with water, forms a plastic paste that hardens only in a wet environment", "construction material that hardens through a mechanical process and transforms into a rigid mass that embeds other materials in its mass"], c: [1] },
+    { q: "According to their origin, non-hydraulic binders can be:", a: ["natural", "unitary - non-clinkerized", "artificial", "mixed with active additives", "unitary - clinkerized"], c: [0, 2] },
+    { q: "What are the conditions a binder must meet to fulfill its role?", a: ["the binder + water paste should be plastic, easy to work with, and adhere well to the substrate and the materials it embeds", "the binder + water paste should be plastic, easy to work with, and not adhere to the substrate but only to the materials it embeds", "to have a setting time suitable for the purpose in which it will be used", "to have a constant volume during hardening and in use", "to harden obligatorily in a wet environment"], c: [0, 2, 3] },
+    { q: "Non-hydraulic binders set (make prize):", a: ["without being mixed with water in a wet environment", "only in a dry environment", "only in a wet environment", "mixed with water both in a dry environment and in a wet environment", "without being mixed with water only in a dry environment"], c: [1] },
+    { q: "Hydraulic binders set:", a: ["only in a wet environment", "only in a dry environment", "instantaneously", "mixed with water both in a dry environment and in a wet environment", "without being mixed with water only in a dry environment"], c: [3] },
+    { q: "Clay is a binder:", a: ["hydraulic – natural", "non-hydraulic – artificial", "hydraulic – unitary – non-clinkerized", "non-hydraulic – natural", "hydraulic – unitary – clinkerized"], c: [3] },
+    { q: "Technical construction plaster (ipsos) is a binder:", a: ["hydraulic – natural", "non-hydraulic – artificial", "hydraulic – unitary – non-clinkerized", "non-hydraulic – natural", "hydraulic – unitary – clinkerized"], c: [1] },
+    { q: "Fat lime is a binder:", a: ["hydraulic – natural", "non-hydraulic – artificial", "hydraulic – unitary – non-clinkerized", "non-hydraulic – natural", "hydraulic – unitary – clinkerized"], c: [1] },
+    { q: "Hydraulic limes are binders:", a: ["hydraulic – natural", "non-hydraulic – artificial", "hydraulic – unitary – non-clinkerized", "non-hydraulic – natural", "hydraulic – unitary – clinkerized"], c: [2] },
+    { q: "Portland cement is a binder:", a: ["hydraulic – natural", "non-hydraulic – artificial", "hydraulic – unitary – non-clinkerized", "non-hydraulic – natural", "hydraulic – unitary – clinkerized"], c: [4] },
+    { q: "Trass-lime is a binder:", a: ["hydraulic – unitary – mixed", "hydraulic – mixed – clinkerized", "hydraulic", "non-hydraulic – mixed – non-clinkerized", "hydraulic – unitary"], c: [2] },
+    { q: "Clinkerization is the burning process:", a: ["until the burning temperature is exceeded", "until the liquefaction temperature is exceeded", "until the solidification temperature is exceeded", "until the melting temperature is reached", "without reaching the melting temperature"], c: [3] },
+    { q: "The clinker obtained after cooling has a structure:", a: ["porous", "rigid", "compact", "plastic", "elasto-plastic"], c: [2] },
+    { q: "Unitary binders are binders to which materials (additives) are added to the base product to improve properties in a maximum proportion of:", a: ["5%", "5-10%", "10%", "10-85%", "15%"], c: [2] },
+    { q: "Mixed binders are binders to which materials (additives) are added to the base product to improve properties in a maximum proportion of:", a: ["20-25%", "35-45%", "50-85%", "10-85%", "5-85%"], c: [3] },
+    { q: "List in descending order the first three chemical elements that make up the earth's crust:", a: ["oxygen, aluminum, and silicon", "oxygen, aluminum, and iron", "oxygen, silicon, and aluminum", "oxygen, silicon, and iron", "oxygen, iron, and silicon"], c: [2] },
+    { q: "Aluminum is part of the composition of the earth's crust in a proportion of approximately:", a: ["5%", "10%", "20%", "7.45%", "9%"], c: [3] },
+    { q: "Silicon is part of the composition of the earth's crust in a proportion of approximately:", a: ["11%", "26%", "40%", "30%", "50%"], c: [1] },
+    { q: "Oxygen is part of the composition of the earth's crust in a proportion of approximately:", a: ["24%", "67%", "49.13%", "30%", "17%"], c: [2] },
+    { q: "Formula: xSiO2 · yAl2O3 · Me2O represents:", a: ["mica", "hydrated silicon dioxide", "feldspars", "clay", "kaolin"], c: [2] },
+    { q: "The final result of the following reactions is: 3(K2O · Al2O3 · 6SiO2) - 2K2O - 12SiO2 + 2H2O -> K2O · 3Al2O3 · 6SiO2 · 2H2O -> K2O · 3Al2O3 · 6SiO2 · 2H2O - K2O + 4H2O -> 3(Al2O3 · 2SiO2 · 2H2O)", a: ["lime", "feldspar", "kaolinite", "plaster", "mica"], c: [2] },
+    { q: "The formula for clay is XSiO2 · YAl2O3 · nH2O. Which of the following statements are correct?", a: ["kaolinitic clays have the ratio X/Y = 4", "kaolinitic clays have the ratio X/Y = 2", "montmorillonitic clays have the ratio X/Y = 2", "montmorillonitic clays have the ratio X/Y = 4", "normal clays have the ratio X/Y = 5"], c: [1, 3] },
+    { q: "Upon humidity variation, clays:", a: ["swell (umflă)", "contract", "crack (fisurează)", "cleave (clivează)", "carbonate"], c: [0, 1, 2] },
+    { q: "Choose the correct statement:", a: ["stabilizing clays through physical methods is done by hydration and coking", "stabilizing clays through physical methods is done by decalcification and with non-plasticizers (degresanți)", "stabilizing clays through physical methods is done with non-plasticizers (degresanți) and by hydrophobization", "stabilizing clays through physical methods is done by hydrophobization and clinkerization", "clays cannot be stabilized through physical methods"], c: [2] },
+    { q: "Hydrophobization is a phenomenon of:", a: ["increasing the water retention capacity", "decreasing the water retention capacity", "decreasing the water retention capacity and a method of clay degradation", "increasing the water retention capacity and a method of clay degradation", "increasing the water retention capacity and a method of clay desalination"], c: [1] },
+    { q: "Clay can be chemically stabilized through the following methods:", a: ["by carbonation, mixing with carbon or injecting with CaCO3", "by silicatization, mixing with soluble glass", "by clinkerization, mixing with clinker and injecting with cement", "with synthetic resins", "with macromolecular cations that produce clay hydrophobization"], c: [1, 3, 4] },
+    { q: "Clays are hydroaluminate compounds of the form:", a: ["XFe2O3 · YAl2O3 · mK2O", "XFe2O3 · YSiO2 · mK2O", "XSiO2 · YAl2O3 · mK2O", "XSiO2 · YAl2O3 · nH2O", "XMgO · YAl2O3 · mH2O"], c: [3] },
+    { q: "The use of non-plasticizers (degresanți) in stabilizing clays produces:", a: ["reduction of water films; decrease of plasticity, increase of workability and final reduction of drying shrinkage", "reduction of water films, decrease of plasticity, maintenance of workability and final reduction of drying shrinkage", "reduction of water films, decrease of plasticity and final reduction of drying shrinkage", "reduction of water films, decrease of plasticity, decrease of workability and final increase of drying shrinkage", "reduction of water films followed by clay calcination"], c: [2] },
+    { q: "To stabilize clays with non-plasticizers (degresanți), the following are used:", a: ["sand; bitumen; limestone; pitch; feldspars; chaff and mica", "sand; feldspars; pitch; chaff; chopped straw; rice hulls and kaolin", "sand; chamotte; chaff; chopped straw and rice hulls", "sand; feldspars; pitch; chaff; rice hulls and mica", "sand; feldspars; pitch; chaff; rice hulls, mica and lime"], c: [2] },
+    { q: "As substances providing Ca2+ ions, the following are used:", a: ["calcium chloride, calcium carbonate and gypsum", "carbon dioxide, calcium oxide and gypsum", "calcium chloride, calcium oxide and pyrite", "calcium chloride, calcium oxide", "calcium chloride, alum and gypsum"], c: [3] },
+    { q: "In hydrophobization stabilization, the character of the clay changes:", a: ["surfactant into hydrophobic", "hydrophobic into surfactant", "hydrophilic into surfactant", "hydrophilic into hydrophobic"], c: [3] },
+    { q: "What is the optimal percentage of cement used for clay stabilization?", a: ["5-15%", "10-25%", "2-25%", "40%", "3%"], c: [0] },
+    { q: "The raw material for manufacturing plaster-based binders is:", a: ["3Al2O3 · 2SiO2 · 2H2O", "CaSO4 · 2H2O", "limestone", "gypsum stone", "alabaster"], c: [1, 3] },
+    { q: "What is the name of the substance CaSO4 · 2H2O?", a: ["gypsum (ghips)", "dihydrate", "semi-hydrate", "plaster", "construction plaster"], c: [0] },
+    { q: "At what temperatures (during burning) is technical construction plaster obtained?", a: ["95-120 °C", "1100 °C", "1200 °C", "65-75 °C", "1450 °C"], c: [0] },
+    { q: "At what temperatures (during burning) is 'dead' plaster obtained?", a: ["95-120 °C", "200-350 °C", "350-450 °C", "450-750 °C", "350-750 °C"], c: [3] },
+    { q: "At what temperatures (during burning) is floor plaster obtained?", a: ["95-120 °C", "200-350 °C", "450-750 °C", "750-1000 °C", "1000-1200 °C"], c: [3] },
+    { q: "At what temperatures (during burning) is calcined plaster obtained?", a: ["95-120 °C", "200-350 °C", "450-750 °C", "750-1000 °C", "1000-1200 °C"], c: [4] },
+    { q: "The technological flow for manufacturing plaster includes the following phases:", a: ["extraction of clay/limestone, crushing, mixing with water, storage, grinding, clinkerization, storage, grinding, and packing", "extraction of limestone, crushing, and burning in kilns", "extraction of gypsum, transport, crushing, burning (dehydration), grinding, and packing in bags", "extraction of clay/limestone, crushing, mixing, storage, grinding, storage, grinding, and packing", "extraction of clay, crushing, mixing, storage, grinding, clinkerization, storage, grinding, and packing"], c: [2] },
+    { q: "The raw material for obtaining plaster is:", a: ["limestone CaCO3", "silica stone SiO2", "semi-hydrate stone CaSO4 · 0.5H2O", "gypsum stone CaSO4 · 4H2O", "gypsum stone CaSO4 · 2H2O"], c: [4] },
+    { q: "The basic substance of technical plaster is:", a: ["semi-hydrate CaSO4 · 0.5H2O", "anhydrite xCaSO4 · 0.5H2O + yCaSO4 (x >> y)", "dead plaster CaSO4", "floor plaster yCaSO4 + zCaO (y >> z)", "calcined plaster yCaSO4 + zCaO (y >> z)"], c: [0] },
+    { q: "Construction plaster is obtained by:", a: ["dissociation of limestone under the influence of temperature", "dehydration of gypsum stone under the influence of temperature", "dissociation or dehydration of limestone under the influence of temperature", "dissociation and decarbonation of gypsum stone under the influence of temperature", "dehydration and decarbonation of gypsum stone under the influence of temperature"], c: [1] },
+    { q: "The burning (calcination) of plaster is done in:", a: ["chamber kilns, calcinators, muffle kilns, vertical kilns, rotary kilns, ball mills, boiling vats and in fluidized beds", "chamber kilns, clinkerizers, muffle kilns, vertical kilns, rotary kilns, ball mills, boiling vats and in fluidized beds", "chamber kilns, vertical kilns, rotary kilns, boiling vats", "chamber kilns, steam boilers, muffle kilns, vertical kilns, rotary kilns, ball mills, boiling vats and in fluidized beds", "chamber kilns, steam boilers, muffle kilns, vertical kilns, rotary kilns, ball mills, vats with rollers"], c: [2] },
+    { q: "The setting and hardening of plaster is influenced by:", a: ["burning temperature", "the fineness of limestone grinding", "the fineness of plaster grinding", "chemical additives: plasticizers and fireproofers", "chemical additives: accelerators and setting retarders"], c: [0, 2, 4] },
+    { q: "The setting and hardening of plaster is a consequence of:", a: ["water saturation of the gypsum", "rehydration of the dihydrate in the presence of water", "crystallization of CaCO3 in the presence of water", "rehydration in solution of the semi-hydrate", "separation and continuous growth of dihydrate crystals along with water evaporation"], c: [3, 4] },
+    { q: "The setting and hardening of plaster is a process:", a: ["static", "dynamic", "physical and chemical", "mechanical", "molecular"], c: [2] },
+    { q: "Plaster putty (Glet) is:", a: ["mixture of gypsum with water", "mixture of plaster with lime and water", "mixture of plaster with lime, cement and water", "mixture of plaster with water", "mixture of plaster with water and paint"], c: [3] },
+    { q: "Always during the preparation of plaster paste one will:", a: ["pour - sprinkle the plaster into the water", "pour - pour water over the plaster", "mix the plaster with cement and sprinkle it into water", "mix the plaster with lime and sprinkle it into water", "mix the plaster with lime over which water will be poured"], c: [0] },
+    { q: "Plaster paste is used for:", a: ["unitary binder", "protecting wood against fire", "molding", "creating decorative elements", "creating support elements for sanitary installations"], c: [0, 2, 3] },
+    { q: "The most important phase in the process of obtaining plaster is:", a: ["extraction of raw material", "transport", "burning of the raw material", "crushing of the raw material", "grinding"], c: [2] },
+    { q: "The use of plaster prefabricates presents the following advantages:", a: ["reduced thermal and acoustic insulation", "good fire resistance", "easy and fast application", "elimination of plasters (wet finishes)", "expensive labor"], c: [1, 2, 3] },
+    { q: "Binders based on plaster are:", a: ["anhydrite cement", "floor plaster", "high-wear plaster", "aluminous plaster", "stucco plaster"], c: [0, 1, 4] },
+    { q: "The raw material for obtaining lime is:", a: ["limestone", "corundum", "calcium chloride", "calcium carbonate", "calcium bicarbonate"], c: [0, 3] },
+    { q: "Dissociation of calcium carbonate takes place starting from the temperature of:", a: ["600 - 700 °C", "400 - 500 °C", "1400 - 1500 °C", "150 - 250 °C", "1100 - 1200 °C"], c: [0] },
+    { q: "Complete dissociation of CaCO3 is done at the temperature:", a: ["600 - 700 °C", "400 - 500 °C", "1400 - 1500 °C", "150 - 250 °C", "1100 - 1200 °C"], c: [4] },
+    { q: "The technological flux for obtaining 'fat' lump lime consists of the phases:", a: ["extraction of clay, extraction of limestone, crushing, mixing with water, storage, clinkerization (CEMENT PROCESS)", "extraction of limestone, crushing and burning it in kilns", "extraction of raw material, crushing, burning (dehydration), grinding and packing in bags", "clay process repeated", "repetition"], c: [1] },
+    { q: "CaCO3 during burning in vertical kilns passes through (in order):", a: ["cooling, preheating, burning", "burning, preheating, cooling", "cooling, burning, preheating", "preheating, cooling, burning", "preheating zone, burning zone, cooling zone"], c: [4] },
+    { q: "In order not to lose its binding capacities immediately after burning and cooling, the lime must be:", a: ["ground", "hydrated", "slaked", "heated", "packed in bags"], c: [2] },
+    { q: "Slaking of lime is done:", a: ["manually", "mechanically", "in paste", "in powder", "dry"], c: [0, 1, 2, 3] },
+    { q: "The reaction CaCO3 -> CaO + CO2 is a reaction:", a: ["exothermic", "endothermic", "neutral", "yielding heat", "consuming heat"], c: [1, 4] },
+    { q: "The reaction CaO + H2O -> Ca(OH)2 is a reaction:", a: ["exothermic", "endothermic", "neutral", "yielding heat", "consuming heat"], c: [0, 3] },
+    { q: "Lime paste is a:", a: ["Ca(OH)2 crystal surrounded by water films", "gel formed of elongated Ca(OH)2 micelles surrounded by water films", "calcium ion formed from elongated Ca(OH)2 micelles", "Ca(OH)2 ion surrounded by water films", "elongated Ca(OH)2 crystals surrounded by water films"], c: [1] },
+    { q: "For a good slaking it is indicated that lime paste be kept in pits for at least:", a: ["15 days", "30 days", "60 days", "6 months", "1 year"], c: [2] },
+    { q: "The reaction CaO + H2O -> Ca(OH)2 + 270 Kcal/kg CaO is the reaction of:", a: ["slaking of the lime", "hardening of the lime", "obtaining the lime", "hydration of calcium oxide", "hydration of carbon oxide"], c: [0, 3] },
+    { q: "The physical process of lime hardening takes place through:", a: ["loss of water through boiling", "loss of water through slaking", "loss of water through evaporation", "loss of water through hydration", "loss of water through hydrolysis"], c: [2] },
+    { q: "Slaking of lime into powder (dry slaking) presents the following advantages:", a: ["eliminates slaking on site", "mortar prepared with it can be used in winter", "it is very easy to transport", "it can be dosed correctly", "it can be used 2-3 days after slaking"], c: [0, 2, 3, 4] },
+    { q: "'Fat' lime is used for:", a: ["preparation of plastering mortars", "preparation of whitewashing solutions", "manufacturing of silica-calcareous products", "manufacturing of alumino-siliceous products", "obtaining hydraulic binders"], c: [0, 1, 2] },
+    { q: "Mixing 'fat' lime with additives transforms it into a hydraulic binder named:", a: ["cement - lime", "lime - plaster", "trass - lime", "slag - lime", "clay - lime"], c: [2] },
+    { q: "Aerial-magnesian lime is a:", a: ["hydraulic binder", "non-hydraulic binder", "mixed binder", "organic binder", "clinkerized binder"], c: [1] },
+    { q: "Hydraulic limes are obtained by burning:", a: ["limestones at temperatures below 200 °C", "clays at temperatures over 1100 °C", "limestones with variable clay content at a temperature lower than the temperature of clinkerization", "limestones with variable clay content at a temperature higher than the temperature of clinkerization", "gypsum at a temperature of 1000 °C"], c: [2] },
+    { q: "The formula Mh = %CaO / (%SiO2 + Al2O3 + %Fe2O3) represents:", a: ["hydraulic modulus", "basic modulus", "calcic modulus", "hydrophobic modulus", "silico-alumino-ferric modulus"], c: [0] },
+    { q: "Hydraulic lime has the following mineralogical compounds:", a: ["dicalcium silicate", "pentacalcium trialuminate", "tetracalcium ferroaluminate", "dicalcium ferrite", "uncombined calcium oxide"], c: [0, 1, 2, 3] },
+    { q: "Hardening of hydraulic lime is similar to the hardening of:", a: ["plaster and lime", "clay and lime", "cement and plaster", "clay and cement", "lime and cement"], c: [4] },
+    { q: "Hydraulic limes are used for:", a: ["mortars and plastering in wet environments", "foundations of heavily loaded buildings", "foundations of lightly loaded buildings", "masonry blocks for exterior walls", "creating leveling and slope concretes"], c: [0, 1, 2, 3, 4] },
+    { q: "Raw materials used in manufacturing Portland cement are:", a: ["limestone", "clay", "gypsum for regulating the setting time", "lime", "plaster"], c: [0, 1, 2] },
+    { q: "The technological flux for obtaining Portland cement consists of:", a: ["extraction, crushing, mixing, clinkerization", "lime process", "plaster process", "extraction (clay/limestone), crushing, mixing with water, silo storage, grinding, clinkerization, storage, final grinding and packing", "extraction, grinding, clinkerization, and packing"], c: [3] },
+    { q: "What is the clinkerization temperature of Portland cement:", a: ["1250 °C", "1350 °C", "1150 °C", "1450 °C", "1700 °C"], c: [3] },
+    { q: "Rotary kilns dimensions and speed:", a: ["10-20 m, 3°, 1-2 rpm", "50 m, 3°, 3-4 rpm", "50-150 m, 3°, 1-2 rpm", "200 m, 2°, 3-4 rpm", "50-150 m, 2°, 3-4 rpm"], c: [2] },
+    { q: "What is Alite?", a: ["2CaO · SiO2", "2CaO · Fe2O3", "3CaO · SiO2", "3CaO · Al2O3", "4CaO · Al2O3 · Fe2O3"], c: [2] },
+    { q: "What is Belite?", a: ["2CaO · SiO2", "2CaO · Fe2O3", "3CaO · SiO2", "3CaO · Al2O3", "4CaO · Al2O3 · Fe2O3"], c: [0] },
+    { q: "What is Celite I?", a: ["2CaO · SiO2", "2CaO · Fe2O3", "3CaO · SiO2", "3CaO · Al2O3", "4CaO · Al2O3 · Fe2O3"], c: [3] },
+    { q: "What is Brownmillerite?", a: ["2CaO · SiO2", "2CaO · Fe2O3", "3CaO · SiO2", "3CaO · Al2O3", "4CaO · Al2O3 · Fe2O3"], c: [4] },
+    { q: "Percentage of Alite in clinker:", a: ["25%", "35%", "10%", "50%", "15%"], c: [3] },
+    { q: "Percentage of Belite in clinker:", a: ["25%", "35%", "10%", "50%", "15%"], c: [0] },
+    { q: "Percentage of Celite I in clinker:", a: ["25%", "35%", "10%", "50%", "15%"], c: [2] },
+    { q: "Percentage of Brownmillerite in clinker:", a: ["25%", "35%", "10%", "50%", "15%"], c: [4] },
+    { q: "Cement setting and hardening is due to:", a: ["physical phenomena and chemical reactions", "atomic reactions", "heating phenomena", "burning reactions", "mixing phenomena"], c: [0] },
+    { q: "Cement setting and hardening is a process of:", a: ["hydrophilization", "lyophilization", "hydration of mineralogical components", "hydrophobization", "lyophobization"], c: [2] },
+    { q: "Cement setting/hardening can take:", a: ["7 days", "28 days", "1 year", "10 years", "decades"], c: [4] },
+    { q: "Highest heat released by hydration of:", a: ["C2S", "C4AF", "cement", "C3S", "C3A"], c: [4] },
+    { q: "Highest hydration speed belongs to:", a: ["C3A", "C4AF", "cement", "C3S", "C2S"], c: [0] },
+    { q: "Highest mechanical resistance:", a: ["C4AF", "C3A", "C2S", "C3S", "Alite"], c: [3, 4] },
+    { q: "Highest contraction (shrinkage):", a: ["C3S", "C2S", "C4AF", "C3A", "Celite I"], c: [3, 4] },
+    { q: "Alitic cement composition:", a: ["at least 60% alite, under 15% belite", "37.5% alite, 37.5% belite", "50% alite, 25% belite", "at least 15% celite, under 10% brownmillerite", "at least 18% brownmillerite, under 7% celite"], c: [0] },
+    { q: "Belitic cement composition:", a: ["at least 60% alite, under 15% belite", "37.5% alite, 37.5% belite", "50% alite, 25% belite", "at least 15% celite, under 10% brownmillerite", "at least 18% brownmillerite, under 7% celite"], c: [1] },
+    { q: "Celitic cement composition:", a: ["at least 60% alite, under 15% belite", "37.5% alite, 37.5% belite", "50% alite, 25% belite", "at least 15% celite, under 10% brownmillerite", "at least 18% brownmillerite, under 7% celite"], c: [3] },
+    { q: "Brownmilleritic cement composition:", a: ["at least 60% alite, under 15% belite", "37.5% alite, 37.5% belite", "50% alite, 25% belite", "at least 15% celite, under 10% brownmillerite", "at least 18% brownmillerite, under 7% celite"], c: [4] },
+    { q: "Special cements speed is obtained by:", a: ["more water during grinding", "increasing grinding fineness and specific surface area"], c: [1] },
+    { q: "White cement is obtained from:", a: ["limestone, clay, bauxite", "limestone, clay, alumina", "limestone and clay with low Fe2O3", "limestone and alumina", "limestone and clay"], c: [2] },
+    { q: "Cement is used for:", a: ["plaster setting", "mortars", "concretes", "lime whitewash", "paints"], c: [1, 2] },
+    { q: "Mineral binders definition:", a: ["fine granules", "coarse granules", "powder materials forming a hardening paste with water", "organic materials", "clinkerized only"], c: [2] },
+    { q: "Mineral binder conditions:", a: ["appropriate setting time", "adhere to substrate", "harden in 10 mins", "constant volume", "set in 5 mins"], c: [0, 1, 3] },
+    { q: "Two groups of mineral binders:", a: ["non-hydraulic, hydraulic, mixed", "natural non-hydraulic, unitary hydraulic", "non-hydraulic, hydraulic", "non-hydraulic, hydraulic, clinkerized", "artificial non-hydraulic, mixed hydraulic"], c: [2] },
+    { q: "Non-hydraulic binders can be:", a: ["unitary and mixed", "natural and artificial", "non-clinkerized and clinkerized", "organic and inorganic", "natural, artificial, mixed"], c: [0, 1] },
+    { q: "Hydraulic mineral binders can be:", a: ["non-clinkerized/mixed", "clinkerized/mixed", "unitary and mixed", "natural/artificial", "unitary non-clinkerized, clinkerized, mixed"], c: [2] },
+    { q: "Unitary hydraulic binders can be:", a: ["natural/artificial", "organic/inorganic", "clinkerized/vitrified", "porous/compact", "non-clinkerized and clinkerized"], c: [4] },
+    { q: "Non-hydraulic binders harden:", a: ["wet only", "wet and dry", "dry only", "specific pressure/temp", "with additives only"], c: [2] },
+    { q: "Plaster setting stages:", a: ["one", "two", "three", "four", "five"], c: [2] },
+    { q: "Setting time definition:", a: ["pouring time", "hardness loss time", "crumbling time", "hardening time", "time from water introduction until paste is rigid"], c: [4] },
+    { q: "Hardened plaster characteristics:", a: ["water soluble", "degrades in wet environments", "expansion ~1%", "porosity 50%", "very high density"], c: [0, 1, 2, 3] },
+    { q: "Plaster uses:", a: ["prefabricates", "ceramic molds", "unitary mortar binder", "mixed binder", "waterproofing"], c: [0, 1, 2, 3] },
+    { q: "Fat lime raw material:", a: ["natural stone", "feldspars", "aluminosilicates", "gypsum", "limestone"], c: [4] },
+    { q: "Fat lime reaction:", a: ["ion exchange", "endogenic", "silicatization", "consumes 43.5 Kcal/mol", "neutralization"], c: [1, 3] },
+    { q: "Fat lime burning temperature:", a: ["600-700 °C", "900 °C", "1100-1200 °C", "1300 °C", "1350 °C"], c: [2] },
+    { q: "Manual slaked lime use time:", a: ["10 days", "2-3 days", "60 days", "80 days", "100 days"], c: [2] },
+    { q: "Manual slaking intro:", a: ["water", "fat lime", "water + fat lime", "lime paste", "barbotine"], c: [2] },
+    { q: "Hydraulic lime raw material:", a: ["natural stone", "feldspars", "aluminosilicates", "gypsum", "limestone"], c: [4] },
+    { q: "Portland cement is a binder:", a: ["natural non-hydraulic", "artificial non-hydraulic", "clinkerized unitary hydraulic", "non-clinkerized unitary hydraulic", "mixed hydraulic"], c: [2] },
+    { q: "Portland cement raw material:", a: ["50% limestone + 50% clay", "75% limestone + 25% clay", "25% limestone + 75% clay", "limestone + gypsum", "limestone + lime"], c: [1] },
+    { q: "Barbotine (slurry) components:", a: ["cement + water", "lime + water", "plaster + water", "limestone + clay + water", "clay + water"], c: [3] },
+    { q: "Portland cement process:", a: ["wet", "dry", "mixed", "thermal dissociation", "electrolytic dissociation"], c: [0, 1, 2] },
+    { q: "Cement clinker production:", a: ["50% limestone + 50% water", "burning mixture at 1450 °C", "25% limestone + 25% water", "limestone + gypsum", "limestone + lime"], c: [1] },
+    { q: "Granular material sampling method:", a: ["halves", "whole", "quartering (sferturi)", "double sample", "piece division"], c: [2] },
+    // Section: Advanced Material Testing (Plaster, Lime, Cement)
+    { q: "Plaster testing forms include:", a: ["mixed", "powder", "paste", "hardened stone", "liquid"], c: [1, 2, 3] },
+    { q: "Grinding fineness rule:", a: ["higher = larger granules", "higher = smaller granules", "higher = rounder", "higher = polyhedral", "higher = cubic"], c: [1] },
+    { q: "Standard method for determining grinding fineness:", a: ["ring and plate", "quartering", "sieving", "sieve 10 only", "7 sieve series"], c: [2] },
+    { q: "In plaster testing, the time until the Vicat needle reaches 30mm from the bottom is:", a: ["setting", "setting end", "hardening", "dilation", "setting beginning"], c: [4] },
+    { q: "In plaster testing, the time until the Vicat needle leaves a barely perceptible mark is:", a: ["setting", "setting end", "hardening", "dilation", "setting beginning"], c: [1] },
+    { q: "The purpose of determining normal consistency water is:", a: ["observe reaction", "dripping point", "appreciate speed", "know water dosage", "grinding fineness"], c: [3] },
+    { q: "Total time for normal consistency determination:", a: ["15s", "120s", "2 mins", "150s", "2 mins 30s"], c: [3, 4] },
+    { q: "Cake diameter for normal consistency of plaster should be:", a: ["58-60mm", "68-70mm", "78-80mm", "88-90mm", "98-100mm"], c: [2] },
+    { q: "Plaster setting stages using the Vicat apparatus include:", a: ["intro paste in ring", "intro in cell", "needle to surface level", "allow penetration", "read depth and stop timer"], c: [0, 2, 3, 4] },
+    { q: "Specimen used for plaster compression resistance testing:", a: ["briquettes", "7.07cm cubes", "4x4x16 prisms", "prism remnants after flexural test", "15cm cylinder"], c: [3] },
+    { q: "Specimen used for plaster flexural resistance testing:", a: ["briquettes", "70cm cubes", "4x4x16 prisms", "prism remnants", "15cm cylinder"], c: [2] },
+    { q: "Compression resistance formula:", a: ["Rti formula", "Rti formula", "Rc = N / A", "stress-strain formula", "modulus formula"], c: [2] },
+    { q: "Fruhling-Michaels flexural formula is represented by:", a: "Rti = 3/2 * (Pl) / (bh^2)", b: "Rti = 3/2 * (Pl) / (a^3)", c: "Rc formula", d: "stress-strain", e: "modulus", c: [0, 1] },
+    { q: "Fruhling-Michaels apparatus is used to determine:", a: ["axial tension", "flexural tension", "compression", "shear", "torsion"], c: [0, 1] },
+    { q: "The hydraulic press is primarily used to determine:", a: ["wear", "fatigue", "compression", "shear", "torsion"], c: [2] },
+    { q: "Sieve 020 or 009 is used to determine which lime property?", a: ["apparent density", "paste density", "stability", "grinding fineness", "yield"], c: [3] },
+    { q: "The volume of paste obtained from 1kg of lump lime is called:", a: ["stability", "slaking residue", "slaking water", "paste yield", "consistency"], c: [3] },
+    { q: "Lime stability is determined by evaluating:", a: ["apparent density", "paste density", "cake aspect", "grinding fineness", "yield"], c: [2] },
+    { q: "Slaking residue of lime contains:", a: ["remaining water", "obtained paste", "impurities in fat lime", "unslaked lump parts", "over-burned particles"], c: [2, 3, 4] },
+    { q: "The property expressed as h/m [l/Kg] is:", a: ["residue", "paste yield", "reactivity", "speed", "density"], c: [1] },
+    { q: "What property is measured for lime paste density?", a: ["residue", "slaking water", "reactivity", "speed", "density"], c: [4] },
+    { q: "Lime for laboratory determination is found in which states?", a: ["dry", "wet", "powder", "paste", "mortar"], c: [2, 3] },
+    { q: "Aerial magnesium lime production involves burning calcareous rocks at:", a: ["1200 °C", "750 °C", "950-1000 °C", "1000 °C", "1450 °C"], c: [2] },
+    { q: "The presence of petrified lumps in a cement mass indicates:", a: ["fineness", "specific surface", "density", "start of alteration", "stability"], c: [3] },
+    { q: "The Blaine permeabilimeter is used to determine:", a: ["fineness", "specific surface", "density", "storage state", "stability"], c: [1] },
+    { q: "The total lateral surface of all granules in 1g of cement is called:", a: ["fineness", "specific surface", "density", "storage state", "stability"], c: [1] },
+    { q: "Residue on sieve 009 for cement determines:", a: ["grinding fineness", "specific surface", "density", "storage state", "stability"], c: [0] },
+    { q: "Density is defined as:", a: ["fineness", "specific surface", "mass per unit volume", "storage state", "stability"], c: [2] },
+    { q: "Cake testing and Le Chatelier rings are used to determine:", a: ["fineness", "specific surface", "density", "storage state", "stability"], c: [4] },
+    { q: "The Vicat apparatus with a Tetmayer probe is used to find:", a: ["hardening", "setting start", "setting", "setting end", "normal consistency water"], c: [4] },
+    { q: "Cracks appearing only in the middle of a cement cake (not edges) indicate:", a: ["contraction", "expansion", "dilation", "humidity", "absorption"], c: [0] },
+    { q: "Cracks appearing at the cake edges indicate:", a: ["contraction", "expansion/swelling", "saturation", "humidity", "absorption"], c: [1] },
+    { q: "Setting start time for standard cement is usually:", a: ["40-45m min", "40-45m max", "a few hours", "a few days", "7 days"], c: [2] },
+    { q: "Practically, the end of the cement setting process is:", a: ["a few hours", "never", "a few minutes", "a few hours", "7 days"], c: [1] },
+    { q: "Specimens for cement flexural resistance testing:", a: ["4x4x16 prisms", "10x10x55 prisms", "prism remnants", "briquettes", "cubes 7.07cm"], c: [0] },
+    { q: "Specimens for Plaster (Ipsos) tension resistance testing:", a: ["4x4x16 prisms", "10x10x55 prisms", "prism remnants", "briquettes", "cubes 7.07cm"], c: [3] },
+    { q: "Cement compression resistance is tested using:", a: ["4x4x16 prisms", "10x10x55 prisms", "prism remnants after flexural test", "briquettes", "cubes 70cm"], c: [2] },
+
+    // Section: Bitumens and Asphalts
+    { q: "Bitumens are characterized as:", a: ["organic, hydrophobic, dark, temp dependent, brittle-plastic", "complex liquid/solid hydrocarbon mixtures", "fluid-viscous condensed hydrocarbons", "asphaltogenic acid mixtures", "high molecular aromatic solids"], c: [0, 1] },
+    { q: "In fluid bitumen, the dispersion medium consists of:", a: ["carbene in petroline", "asphaltene/maltene micelles", "maltenes in petrolene", "associated micelles", "3D network"], c: [2] },
+    { q: "In fluid bitumen, the dispersoid (dispersed phase) consists of:", a: ["asphaltene in carbene", "asphaltene/carbene/maltene micelles", "maltenes in petrolene", "associated groups", "3D network"], c: [0, 1] },
+    { q: "The property of bitumen to adhere to solid surfaces even in the presence of water is:", a: ["sol-gel property", "wetting capacity", "adhesion/adhesiveness", "easy processing", "plastic-fluid transition"], c: [2] },
+    { q: "The reversible isothermal sol-gel property of bitumens is called:", a: ["thixotropy", "wetting capacity", "corrosion resistance", "easy processing", "transition state"], c: [0] },
+    { q: "The irreversible chemical/structural change that worsens bitumen properties over time is:", a: ["aging", "wetting capacity", "corrosion resistance", "easy processing", "transition state"], c: [0] },
+    { q: "Substrate adhesion is measured by:", a: ["plasticity loss", "force needed for detachment", "corrosion resistance", "processing", "transition"], c: [1] },
+    { q: "Regarding chemical resistance, bitumen:", a: ["plasticity loss", "wetting", "resists bases/salts/acids, fails oils/fats/plasticizers", "processing", "transition"], c: [2] },
+    { q: "Plasticity is the property to deform without breaking between:", a: ["loss", "wetting", "corrosion", "softening and Fraass breaking points", "transition"], c: [3] },
+    { q: "Ductility is the property of bitumen to:", a: ["wetting", "corrosion", "be drawn into thin threads", "aging sensitivity", "purity"], c: [2] },
+    { q: "Asphalt concretes are defined as a mixture of:", a: ["particles in water", "bitumen in solvents", "lime paste mixture", "bitumen/filler mixture", "sand, filler, gravel, binder"], c: [4] },
+    { q: "Average bitumen binder dosage in asphalt concrete is approximately:", a: ["15-16%", "8%", "14-16%", "< 7%", "> 7%"], c: [1] },
+    { q: "Fine part (filler + sand) proportion in asphalt concrete is approximately:", a: ["15-16%", "7-9%", "15%", "< 7%", "> 7%"], c: [2] },
+    { q: "Over long periods, asphalt concrete compression resistance tends to:", a: ["increase", "constant", "high increase", "slow decrease", "rapid decrease"], c: [3] },
+    { q: "The Richardson penetrometer determines bitumen consistency at:", a: ["0 °C", "10 °C", "20 °C", "25 °C", "50 °C"], c: [3] },
+    { q: "The Ring and Ball (Inel și Bilă) method is used to determine:", a: ["drop point", "softening point", "penetration", "breaking point", "ductility"], c: [1] },
+    { q: "The Fraass method is used to determine the:", a: ["drop point", "softening", "penetration", "breaking point", "ductility"], c: [3] },
+    // Section I: Mechanical Properties and Stress-Strain Relations
+    { q: "The property of a body to undergo changes in dimension or volume under the action of external forces is called:", a: ["oppose fluid passage", "allow fluid passage", "resist freeze-thaw", "heat flux", "deformation"], c: [4] },
+    { q: "Solid dispersion systems include:", a: ["air", "gels", "soils", "fog", "alloys"], c: [4] },
+    { q: "Loading that aims to increase the dimensions of a material along the axis of application is a:", a: ["tensile test", "compression", "flexural", "specific surface", "specific volume"], c: [0] },
+    { q: "The formula Rti = 3/2 * (Pl) / a^3 is used to calculate:", a: ["Hooke's law", "compression", "flexural tension resistance", "deformation", "tension"], c: [2] },
+    { q: "Loading that aims to decrease the dimensions of a material is a:", a: ["tension", "compression test", "flexural", "specific surface", "specific volume"], c: [1] },
+    { q: "The relation Rt = N / A represents:", a: ["flexural", "Hooke's law", "compression", "deformation", "axial/centric tension resistance"], c: [4] },
+    { q: "The relation Δl = (N * l) / (E * A) determines:", a: ["flexural", "Hooke's law", "compression", "deformation under tension/compression", "tension"], c: [3] },
+    { q: "The relation σ = E * ε represents:", a: ["flexural", "Hooke's law", "compression", "deformation", "tension"], c: [1] },
+    { q: "The relation Rti = M / W represents:", a: ["flexural tension resistance", "Hooke's law", "compression", "deformation", "tension"], c: [0] },
+    { q: "The relation Rc = N / A represents:", a: ["flexural", "Hooke's law", "compression resistance", "deformation", "tension"], c: [2] },
+    { q: "In the deformation formula, the symbol 'N' represents:", a: ["deformation", "element length", "Young's modulus", "cross-section", "applied force/load"], c: [4] },
+    { q: "In the stress-strain formula, the symbol 'E' represents:", a: ["deformation", "length", "Young's modulus", "section", "force"], c: [2] },
+    { q: "In the deformation formula, the symbol 'l' represents:", a: ["material deformation", "length of tested element", "Young's modulus", "section", "force"], c: [1] },
+    { q: "In the compression resistance formula, the symbol 'A' represents:", a: ["deformation", "length", "Young's modulus", "cross-section area", "force"], c: [3] },
+    { q: "In the deformation formula, the symbol 'Δl' represents:", a: ["material deformation", "length", "Young's modulus", "section", "force"], c: [0] },
+    { q: "In the stress-strain formula, the symbol 'ε' represents:", a: ["temp variation", "specific deformation/strain", "unit effort", "bending moment", "resistance modulus"], c: [1] },
+    { q: "In the flexural formula, the symbol 'M' represents:", a: ["temp variation", "strain", "unit effort", "bending moment", "modulus"], c: [3] },
+    { q: "In the stress-strain formula, the symbol 'σ' represents:", a: ["temp variation", "strain", "unit effort/stress", "moment", "modulus"], c: [2] },
+    { q: "In the flexural formula, the symbol 'W' represents:", a: ["variation", "strain", "effort", "moment", "resistance modulus of the section"], c: [4] },
+    { q: "An infinitely small force acting on an infinitely small surface is called:", a: ["unit stress", "deformation", "strain", "elastic deformation", "plastic deformation"], c: [0] },
+    { q: "The change in dimensions under external action is called:", a: ["unit effort", "deformation", "strain", "elastic", "plastic"], c: [1] },
+    { q: "The change in volume or form relative to initial length is:", a: ["effort", "deformation", "specific deformation/strain", "elastic", "plastic"], c: [2] },
+    { q: "Dimension changes that vanish after load removal are:", a: ["effort", "deformation", "strain", "elastic deformation", "plastic"], c: [3] },
+    { q: "Dimension changes that do not vanish after load removal are:", a: ["effort", "deformation", "strain", "elastic", "plastic deformation"], c: [4] },
+    { q: "Loads that increase continuously and slowly to a final value are used in:", a: ["permanent", "static tests", "temporary", "dynamic", "exceptional"], c: [1] },
+    { q: "Loads with constant intensity over time are used in:", a: ["permanent tests", "static", "temporary", "dynamic", "exceptional"], c: [0] },
+    { q: "Loads that vary over time and can be absent are used in:", a: ["permanent", "static", "temporary tests", "dynamic", "exceptional"], c: [2] },
+    { q: "High intensity loads occurring at rare intervals are:", a: ["permanent", "static", "temporary", "dynamic", "exceptional tests"], c: [4] },
+    { q: "Loads where the final value is applied abruptly are:", a: ["permanent", "static", "temporary", "dynamic tests", "exceptional"], c: [3] },
+    { q: "Loads following a sinusoidal law are used in:", a: ["permanent", "static", "temporary", "dynamic", "cyclic tests"], c: [4] },
+
+    // Section II: Resistance and Testing
+    { q: "Shock flexural resistance (resilience) is defined as:", a: ["energy/volume", "mechanical work consumed / breaking section area", "ball force", "min cyclic load", "mass loss"], c: [1] },
+    { q: "Wear resistance is defined as:", a: ["energy/volume", "work/area", "ball force", "min cyclic", "mass loss / stressed section area"], c: [4] },
+    { q: "Shock compression resistance is defined as:", a: ["energy / specimen volume", "work/area", "ball force", "min cyclic", "mass loss"], c: [0] },
+    { q: "Hardness of a material (Brinell) is calculated by:", a: ["energy/volume", "work/area", "ball force vs spherical calotte area", "fatigue", "mass loss"], c: [2] },
+    { q: "Specimen forms used for tension resistance testing include:", a: ["briquettes", "cube", "prism", "cylinder", "prism remnants"], c: [0, 2] },
+    { q: "Specimen forms used for compression resistance testing include:", a: ["briquettes", "cube", "prism", "cylinder", "prism remnants"], c: [1, 3, 4] },
+    { q: "In the flexural tensile strength formula Rti = 3/2 * (Pl) / (2bh^2), 'h' represents:", a: ["flexural force", "distance between supports", "base", "cross-section height of specimen", "moment"], c: [3] },
+    { q: "In the flexural tensile strength formula, 'l' represents:", a: ["force", "distance between support points", "base", "height", "moment"], c: [1] },
+    { q: "In the flexural tensile strength formula, 'P' represents:", a: ["force that produces bending", "distance", "base", "height", "moment"], c: [0] },
+    { q: "Loading forces of the same direction but opposite sense that elongate a material along its axis is:", a: ["compressive test", "axial tensile test", "flexural tensile", "breaking", "fatigue"], c: [1] },
+    { q: "Compressive strength is determined using a hydraulic press on:", a: ["axial tension", "flexural tension", "cubes, prism ends, and cylinders", "fatigue", "breaking"], c: [2] },
+    { q: "The Fruhling-Michaels apparatus is used to determine:", a: ["axial tensile strength", "flexural tensile strength", "compressive strength", "fatigue", "breaking"], c: [0, 1] },
+    { q: "Specimens shaped like 'eights' or 'briquettes' are tested for:", a: ["axial tensile strength", "flexural tensile", "compressive", "fatigue", "breaking"], c: [0] },
+    { q: "Shock flexural resistance (resilience) is determined by the relation:", a: ["Rc", "Rt", "Rti", "Kn = (G * h) / A0", "shock compressive"], c: [3] },
+    { q: "The relation Rs = (G * Σhi) / V determines:", a: ["compressive strength", "axial tensile strength", "flexural tensile strength", "shock flexural resistance", "shock compressive resistance"], c: [4] },
+    { q: "Which property can be determined using a prism-shaped specimen with a notch in the middle?", a: ["compressive strength", "axial tensile strength", "flexural tensile strength", "shock flexural resistance", "shock compressive resistance"], c: [3] },
+    { q: "With the help of the Charpy hammer (pendulum), the following is determined:", a: ["compressive strength", "axial tensile strength", "flexural tensile strength", "shock flexural resistance", "shock compressive resistance"], c: [3] }
+
+
+];
+
+let testQuestions = [];
+let currentIdx = 0;
+let correctCount = 0;
+let userSelected = [];
+
+function startTest() {
+    // ALGORITMUL DE ALEGERE RANDOM:
+    // 1. Amestecăm toată baza de date
+    let shuffled = [...allQuestions].sort(() => 0.5 - Math.random());
+    // 2. Luăm primele 55 (sau câte sunt disponibile dacă baza e mică)
+    testQuestions = shuffled.slice(0, 55);
+    
+    document.getElementById('start-screen').classList.remove('active');
+    document.getElementById('quiz-area').classList.add('active');
+    renderQuestion();
+}
+
+function renderQuestion() {
+    userSelected = [];
+    const q = testQuestions[currentIdx];
+    document.getElementById('q-idx').innerText = `${currentIdx + 1}/${testQuestions.length}`;
+    document.getElementById('q-text').innerText = q.q;
+    
+    const container = document.getElementById('options-container');
+    container.innerHTML = '';
+    
+    q.a.forEach((opt, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'option';
+        btn.innerText = opt;
+        btn.onclick = () => {
+            if(q.c.length === 1) {
+                userSelected = [i];
+                document.querySelectorAll('.option').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+            } else {
+                if(userSelected.includes(i)) userSelected = userSelected.filter(x => x !== i);
+                else userSelected.push(i);
+                btn.classList.toggle('selected');
+            }
+        };
+        container.appendChild(btn);
+    });
+    document.getElementById('next-btn').disabled = false;
+    document.getElementById('next-btn').innerText = "VERIFICĂ RĂSPUNSUL";
+    document.getElementById('next-btn').onclick = checkAnswer;
+}
+
+function checkAnswer() {
+    const q = testQuestions[currentIdx];
+    const btns = document.querySelectorAll('.option');
+    
+    const isCorrect = q.c.length === userSelected.length && q.c.every(v => userSelected.includes(v));
+    
+    btns.forEach((btn, i) => {
+        btn.disabled = true;
+        if(q.c.includes(i)) btn.classList.add('correct');
+        else if(userSelected.includes(i)) btn.classList.add('wrong');
+    });
+
+    if(isCorrect) correctCount++;
+    document.getElementById('c-ok').innerText = correctCount;
+
+    const nextBtn = document.getElementById('next-btn');
+    nextBtn.innerText = "URMĂTOAREA ÎNTREBARE";
+    nextBtn.onclick = nextQuestion;
+}
+
+function nextQuestion() {
+    currentIdx++;
+    if(currentIdx < testQuestions.length) {
+        renderQuestion();
+    } else {
+        showFinal();
+    }
+}
+
+function showFinal() {
+    document.getElementById('quiz-area').classList.remove('active');
+    document.getElementById('result-screen').classList.add('active');
+    document.getElementById('final-score').innerText = `${correctCount} / ${testQuestions.length}`;
+}
+</script>
+</body>
+</html>
